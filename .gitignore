@@ -1,0 +1,48 @@
+# Anchor
+.anchor
+target
+**/*.rs.bk
+test-ledger
+
+# Dependencies
+node_modules
+.yarn
+bun.lockb
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist
+build
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Solana keypairs (SECRETS - never commit)
+keypairs/
+test-wallets/
+
+# Surfpool local state
+.surfpool/
+
+# Claude Code personal instructions
+CLAUDE.md
+
+# Beads local tracking
+.beads/

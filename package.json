@@ -1,0 +1,21 @@
+{
+  "name": "lode-protocol",
+  "version": "0.1.0",
+  "description": "LODE - Gamified Gold on Solana",
+  "license": "MIT",
+  "scripts": {
+    "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
+    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+    "test": "bun test",
+    "test:surfpool": "bun test tests/surfpool/"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.0",
+    "@solana/spl-token": "^0.4.13"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,24 @@
+[simnet]
+slot_time = 400
+
+[datasource]
+network = "devnet"
+
+[[programs]]
+name = "lode-token"
+program_id = "4zhmTKDqo48DDxeGrpkDBxh1Wv9Br5onaHcRJLJDifrs"
+binary_path = "target/deploy/lode_token.so"
+
+[[programs]]
+name = "lode-treasury"
+program_id = "2X4W4GDrX3v537HHfDCyeACYD7QBr3cNZa2bV4kMjiY5"
+binary_path = "target/deploy/lode_treasury.so"
+
+[[programs]]
+name = "lode-mining"
+program_id = "7t9rXjXvx9n8mfQBuwEP927DVFmvSkcJVPfXUGjAvSdh"
+binary_path = "target/deploy/lode_mining.so"
+
+[[clone]]
+# Clone Token-2022 program from devnet
+program_id = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"

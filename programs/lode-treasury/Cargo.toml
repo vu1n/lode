@@ -1,0 +1,16 @@
+[package]
+name = "lode-treasury"
+version = "0.2.0"
+edition = "2021"
+description = "LODE Protocol v2 - Treasury fee harvesting and distribution"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = []
+
+[dependencies]
+pinocchio = "0.9"
+pinocchio-system = "0.4"
+pinocchio-pubkey = "0.3"

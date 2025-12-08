@@ -1,0 +1,31 @@
+[package]
+name = "lode-mining"
+version = "0.2.0"
+edition = "2021"
+description = "LODE Protocol v2 - NFT miner creation, upgrades, and lottery"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = []
+
+[dependencies]
+pinocchio = "0.9"
+pinocchio-system = "0.4"
+pinocchio-pubkey = "0.3"
+pinocchio-token = "0.4"
+
+# Testing Strategy:
+# 1. Pure Rust tests (tests/tla_invariants.rs, tests/integration.rs)
+#    - Logic verification tied to TLA+ specs
+#    - Fast, no external dependencies
+#    - Run: cargo test -p lode-mining
+#
+# 2. Surfpool E2E tests (tests/surfpool/)
+#    - Program testing with compiled .so
+#    - Requires: surfpool start
+#    - Run: bun test
+#
+# Note: LiteSVM skipped due to Solana SDK 3.x / Pinocchio version conflicts
+# Surfpool provides equivalent coverage with better developer experience

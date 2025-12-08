@@ -1,0 +1,29 @@
+################################################################
+# Manage lode deployment through Crypto Infrastructure as Code
+################################################################
+
+addon "svm" {
+    rpc_api_url = input.rpc_api_url
+    network_id = input.network_id
+}
+
+action "deploy_lode_token" "svm::deploy_program" {
+    description = "Deploy lode_token program"
+    program = svm::get_program_from_native_project("lode_token")
+    authority = signer.authority
+    payer = signer.payer
+}
+
+action "deploy_lode_treasury" "svm::deploy_program" {
+    description = "Deploy lode_treasury program"
+    program = svm::get_program_from_native_project("lode_treasury")
+    authority = signer.authority
+    payer = signer.payer
+}
+
+action "deploy_lode_mining" "svm::deploy_program" {
+    description = "Deploy lode_mining program"
+    program = svm::get_program_from_native_project("lode_mining")
+    authority = signer.authority
+    payer = signer.payer
+}
