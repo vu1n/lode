@@ -16,7 +16,7 @@ binary_path = "target/deploy/lode_treasury.so"
 
 [[programs]]
 name = "lode-mining"
-program_id = "7t9rXjXvx9n8mfQBuwEP927DVFmvSkcJVPfXUGjAvSdh"
+program_id = "CSrYQ2uEURizXFDruLVyHUXcNN1Dv3XKFdbPnddMF2pB"
 binary_path = "target/deploy/lode_mining.so"
 
 [[clone]]

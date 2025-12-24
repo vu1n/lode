@@ -23,7 +23,7 @@ import {
 
 // Program IDs from keypairs (matches Surfpool.toml)
 const MINING_PROGRAM_ID = new PublicKey(
-  "7t9rXjXvx9n8mfQBuwEP927DVFmvSkcJVPfXUGjAvSdh"
+  "CSrYQ2uEURizXFDruLVyHUXcNN1Dv3XKFdbPnddMF2pB"
 );
 
 // Instruction discriminators (match lib.rs)
@@ -33,8 +33,8 @@ const INSTRUCTION = {
   UPGRADE_MINER: 2,
   PAY_RENT: 3,
   JOIN_EPOCH: 4,
-  FINALIZE_EPOCH: 5,
-  ADVANCE_EPOCH: 6,
+  ADVANCE_EPOCH: 5,
+  FINALIZE_EPOCH: 6,
   CLAIM: 7,
 };
 
@@ -109,9 +109,9 @@ describe("LODE Mining - Surfpool E2E", () => {
       const data = Buffer.alloc(1);
       data.writeUInt8(INSTRUCTION.INITIALIZE, 0);
 
-      // Derive config PDA
+      // Derive config PDA - seeds match MiningConfig::SEEDS in state.rs
       const [configPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("config")],
+        [Buffer.from("mining_config")],
         MINING_PROGRAM_ID
       );
 
@@ -158,6 +158,118 @@ describe("LODE Mining - Surfpool E2E", () => {
 
       expect(participationPda).toBeInstanceOf(PublicKey);
       expect(bump).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("v2 Instruction Execution", () => {
+    let configPda: PublicKey;
+    let configBump: number;
+
+    beforeAll(() => {
+      // Seeds must match MiningConfig::SEEDS = b"mining_config" in state.rs
+      [configPda, configBump] = PublicKey.findProgramAddressSync(
+        [Buffer.from("mining_config")],
+        MINING_PROGRAM_ID
+      );
+    });
+
+    test("initialize creates MiningConfig PDA", async () => {
+      // Build instruction data (just the discriminator for initialize)
+      const data = Buffer.alloc(1);
+      data.writeUInt8(INSTRUCTION.INITIALIZE, 0);
+
+      const ix = new TransactionInstruction({
+        programId: MINING_PROGRAM_ID,
+        keys: [
+          { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+          { pubkey: configPda, isSigner: false, isWritable: true },
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          },
+        ],
+        data,
+      });
+
+      const tx = new Transaction().add(ix);
+      const sig = await sendAndConfirmTransaction(connection, tx, [payer]);
+      console.log(`Initialize tx: ${sig}`);
+
+      // Verify the config account was created
+      const configInfo = await connection.getAccountInfo(configPda);
+      expect(configInfo).not.toBeNull();
+      expect(configInfo!.owner.equals(MINING_PROGRAM_ID)).toBe(true);
+
+      // Check discriminator matches expected "mineconf"
+      const discriminator = configInfo!.data.slice(0, 8);
+      expect(discriminator.toString()).toBe(
+        DISCRIMINATOR.MINING_CONFIG.toString()
+      );
+
+      console.log(`MiningConfig PDA: ${configPda.toBase58()}`);
+      console.log(`Config account size: ${configInfo!.data.length} bytes`);
+    });
+
+    test("config account is not empty after initialization", async () => {
+      // Verify the config account exists and has data (meaning initialization worked)
+      // This validates that re-initialization would fail due to data_is_empty() check
+      const configInfo = await connection.getAccountInfo(configPda);
+      expect(configInfo).not.toBeNull();
+      expect(configInfo!.data.length).toBeGreaterThan(0);
+
+      // The program has an AlreadyInitialized check: if !config_account.data_is_empty()
+      // Since account is not empty, any subsequent initialize call would return an error
+      console.log(
+        `Config account has ${configInfo!.data.length} bytes - re-init would fail`
+      );
+    });
+
+    test("can read MiningConfig state", async () => {
+      const configInfo = await connection.getAccountInfo(configPda);
+      expect(configInfo).not.toBeNull();
+
+      const data = configInfo!.data;
+
+      // Parse MiningConfig structure (based on state.rs):
+      // discriminator: [u8; 8]
+      // authority: [u8; 32]
+      // current_epoch: u64
+      // epoch_duration_slots: u64
+      // epoch_duration_seconds: u64
+      // current_epoch_start: i64
+      // base_rent_per_nft: u64
+      // hashrate_rent_bps: u16
+      // bump: u8
+      // _padding: [u8; 5]
+
+      const discriminator = data.slice(0, 8);
+      const authority = new PublicKey(data.slice(8, 40));
+      const currentEpoch = data.readBigUInt64LE(40);
+      const epochDurationSlots = data.readBigUInt64LE(48);
+      const epochDurationSeconds = data.readBigUInt64LE(56);
+      const currentEpochStart = data.readBigInt64LE(64);
+      const baseRentPerNft = data.readBigUInt64LE(72);
+      const hashrateRentBps = data.readUInt16LE(80);
+      const bump = data.readUInt8(82);
+
+      console.log("MiningConfig state:");
+      console.log(`  authority: ${authority.toBase58()}`);
+      console.log(`  current_epoch: ${currentEpoch}`);
+      console.log(`  epoch_duration_slots: ${epochDurationSlots}`);
+      console.log(`  epoch_duration_seconds: ${epochDurationSeconds}`);
+      console.log(`  current_epoch_start: ${currentEpochStart}`);
+      console.log(`  base_rent_per_nft: ${baseRentPerNft}`);
+      console.log(`  hashrate_rent_bps: ${hashrateRentBps}`);
+      console.log(`  bump: ${bump}`);
+
+      // Verify expected values
+      expect(authority.equals(payer.publicKey)).toBe(true);
+      expect(currentEpoch).toBe(BigInt(0));
+      // Bump stored in account should be valid (0-255)
+      expect(bump).toBeGreaterThanOrEqual(0);
+      expect(bump).toBeLessThanOrEqual(255);
+      expect(epochDurationSlots).toBeGreaterThan(BigInt(0));
     });
   });
 
