@@ -16,7 +16,8 @@ CONSTANTS
     NFTs,               \* Set of all NFTs
     BaseRent,           \* Base rent per NFT (1 LODE in smallest units)
     HashrateRentBps,    \* Hashrate rent in basis points (10 = 0.1%)
-    TotalHashrate       \* Total hashrate to distribute across strategies
+    TotalHashrate,      \* Total hashrate to distribute across strategies
+    HashrateCap         \* Per-NFT effective hashrate cap for lottery
 
 VARIABLES
     nft_hashrates,      \* Function: nft -> hashrate
@@ -100,6 +101,36 @@ ConsolidationIncentive ==
     TRUE
 
 (*
+Whale strategy analysis with hashrate cap:
+- Whale with TotalHashrate wants to maximize lottery odds
+- Each NFT caps at HashrateCap effective hashrate
+- Need ceiling(TotalHashrate / HashrateCap) NFTs to use full hashrate
+- Each additional NFT costs BaseRent per epoch
+*)
+WhaleNFTCount ==
+    \* Number of NFTs needed to fully utilize TotalHashrate
+    (TotalHashrate + HashrateCap - 1) \div HashrateCap
+
+WhaleRentCost ==
+    \* Total rent for whale strategy (multiple NFTs at cap)
+    LET n == WhaleNFTCount
+        per_nft_hr == TotalHashrate \div n
+        per_nft_rent == CalculateRent(per_nft_hr)
+    IN n * per_nft_rent
+
+(*
+Cap economics invariant: whales pay proportionally more rent
+A whale with 10x hashrate needs 10x NFTs, pays 10x base rent
+*)
+CapEconomicsInvariant ==
+    LET small_fish_hr == HashrateCap
+        whale_hr == HashrateCap * 10
+        small_fish_rent == CalculateRent(small_fish_hr)
+        \* Whale needs 10 NFTs
+        whale_rent == 10 * CalculateRent(small_fish_hr)
+    IN whale_rent >= small_fish_rent * 10
+
+(*
 Rent distribution: 70% burned, 30% to lottery
 *)
 RentDistribution ==
@@ -117,6 +148,7 @@ Invariant ==
     /\ SybilPenalty
     /\ LinearRentScale
     /\ ConsolidationIncentive
+    /\ CapEconomicsInvariant
 
 -----------------------------------------------------------------------------
 

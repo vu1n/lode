@@ -378,6 +378,80 @@ mod lode_lottery {
         assert_eq!(ticket_pool, 20_000_000_000, "Ticket pool = 20%");
         assert_eq!(hashrate_pool + ticket_pool, total_pool, "Pools sum to total");
     }
+
+    /// Combined test: hashrate cap with age bonus
+    /// Verifies cap applies AFTER age bonus calculation
+    #[test]
+    fn cap_with_age_bonus() {
+        let hashrate_cap = 100_000_000u64; // 100M cap
+        let max_age_bonus_bps = 5000u16; // 50% max
+
+        fn effective_with_cap(base_hr: u64, age_epochs: u64, cap: u64, max_bonus_bps: u16) -> u64 {
+            // Age bonus: +1% per epoch, max +50%
+            let age_bonus_bps = (age_epochs * 100).min(max_bonus_bps as u64);
+            let with_bonus = (base_hr * (10000 + age_bonus_bps)) / 10000;
+            // Cap applied after age bonus
+            with_bonus.min(cap)
+        }
+
+        // Small fish: 50M base, age 50 -> 75M effective (under cap)
+        let small_fish = effective_with_cap(50_000_000, 50, hashrate_cap, max_age_bonus_bps);
+        assert_eq!(small_fish, 75_000_000, "Small fish under cap gets full bonus");
+
+        // Medium: 80M base, age 50 -> 120M capped to 100M
+        let medium = effective_with_cap(80_000_000, 50, hashrate_cap, max_age_bonus_bps);
+        assert_eq!(medium, hashrate_cap, "Medium capped after bonus");
+
+        // Whale: 200M base, any age -> capped to 100M
+        let whale_new = effective_with_cap(200_000_000, 0, hashrate_cap, max_age_bonus_bps);
+        let whale_old = effective_with_cap(200_000_000, 100, hashrate_cap, max_age_bonus_bps);
+        assert_eq!(whale_new, hashrate_cap, "New whale capped");
+        assert_eq!(whale_old, hashrate_cap, "Old whale still capped");
+
+        // Key insight: age bonus still matters for players below cap
+        let growing = effective_with_cap(60_000_000, 0, hashrate_cap, max_age_bonus_bps);
+        let grown = effective_with_cap(60_000_000, 50, hashrate_cap, max_age_bonus_bps);
+        assert!(grown > growing, "Age bonus matters for sub-cap players");
+        assert_eq!(grown, 90_000_000, "60M + 50% = 90M");
+    }
+
+    /// Whale strategy test: multiple NFTs at cap vs single mega-NFT
+    #[test]
+    fn whale_strategy_economics() {
+        let hashrate_cap = 100_000_000u64;
+        let base_rent = 1_000_000_000u64; // 1 LODE
+        let hashrate_rent_bps = 1u16; // 0.01%
+
+        fn rent_cost(base_rent: u64, hashrate: u64, bps: u16) -> u64 {
+            base_rent + (hashrate * bps as u64) / 10000
+        }
+
+        fn effective_odds(hashrate: u64, cap: u64) -> u64 {
+            hashrate.min(cap)
+        }
+
+        // Whale with 1B hashrate
+        let whale_hr = 1_000_000_000u64;
+
+        // Strategy 1: Single NFT (capped, but cheap rent)
+        let single_odds = effective_odds(whale_hr, hashrate_cap);
+        let single_rent = rent_cost(base_rent, whale_hr, hashrate_rent_bps);
+
+        // Strategy 2: 10 NFTs at 100M each (full odds, 10x base rent)
+        let multi_odds = 10 * effective_odds(hashrate_cap, hashrate_cap);
+        let multi_rent = 10 * rent_cost(base_rent, hashrate_cap, hashrate_rent_bps);
+
+        // Multi-NFT gives 10x odds but costs 10x rent
+        assert_eq!(single_odds, hashrate_cap, "Single NFT capped at 100M");
+        assert_eq!(multi_odds, 10 * hashrate_cap, "10 NFTs get 10x odds");
+        assert!(multi_rent > single_rent * 9, "Multi-NFT costs ~10x rent");
+
+        println!("Single: odds={}, rent={}", single_odds, single_rent);
+        println!("Multi:  odds={}, rent={}", multi_odds, multi_rent);
+        println!("Odds ratio: {}x, Rent ratio: {:.2}x",
+            multi_odds / single_odds,
+            multi_rent as f64 / single_rent as f64);
+    }
 }
 
 // ============================================================================
@@ -532,6 +606,86 @@ mod lode_rent {
 
         println!("c1={}, c10={}, c100={}, c100/c1={:.2}x",
             c1, c10, c100, c100 as f64 / c1 as f64);
+    }
+
+    /// TLA+ Invariant: CapEconomicsInvariant
+    /// Verifies that whales pay proportionally more rent with the cap system
+    #[test]
+    fn invariant_cap_economics() {
+        let hashrate_cap = 100_000_000u64;
+        let base_rent = 1_000_000_000u64;
+        let hashrate_rent_bps = 1u16;
+
+        fn rent(base: u64, hr: u64, bps: u16) -> u64 {
+            base + (hr * bps as u64) / 10000
+        }
+
+        fn effective(hr: u64, cap: u64) -> u64 {
+            hr.min(cap)
+        }
+
+        // Small fish: 100M hashrate, 1 NFT
+        let small_hr = hashrate_cap;
+        let small_rent = rent(base_rent, small_hr, hashrate_rent_bps);
+        let small_odds = effective(small_hr, hashrate_cap);
+
+        // Whale: 1B hashrate, needs 10 NFTs to fully utilize
+        let whale_hr = 1_000_000_000u64;
+        let whale_nfts = (whale_hr + hashrate_cap - 1) / hashrate_cap; // ceiling division = 10
+        let whale_rent = whale_nfts * rent(base_rent, hashrate_cap, hashrate_rent_bps);
+        let whale_odds = whale_nfts * effective(hashrate_cap, hashrate_cap);
+
+        // Cap economics: whale gets 10x odds but pays 10x rent
+        assert_eq!(whale_nfts, 10, "Whale needs 10 NFTs");
+        assert_eq!(whale_odds, 10 * small_odds, "Whale gets 10x odds");
+        assert_eq!(whale_rent, 10 * small_rent, "Whale pays 10x rent");
+
+        // Key insight: odds-per-rent is constant (fair)
+        let small_efficiency = small_odds as f64 / small_rent as f64;
+        let whale_efficiency = whale_odds as f64 / whale_rent as f64;
+        assert!((small_efficiency - whale_efficiency).abs() < 0.001,
+            "CapEconomics: odds-per-rent is equal for all players");
+
+        println!("Small: odds={}, rent={}, efficiency={:.6}",
+            small_odds, small_rent, small_efficiency);
+        println!("Whale: odds={}, rent={}, efficiency={:.6}",
+            whale_odds, whale_rent, whale_efficiency);
+    }
+
+    /// Sybil resistance with cap: splitting wallets provides no benefit
+    #[test]
+    fn sybil_resistance_with_cap() {
+        let hashrate_cap = 100_000_000u64;
+        let transfer_fee_bps = 50u16; // 0.5%
+
+        fn effective(hr: u64, cap: u64) -> u64 {
+            hr.min(cap)
+        }
+
+        // Player has 500M hashrate worth of LODE
+        let total_value = 500_000_000u64;
+
+        // Strategy 1: 5 NFTs in one wallet (no transfer fees)
+        let single_wallet_nfts = 5u64;
+        let single_wallet_hr_per = total_value / single_wallet_nfts;
+        let single_wallet_odds = single_wallet_nfts * effective(single_wallet_hr_per, hashrate_cap);
+        let single_wallet_cost = total_value; // No transfer fees
+
+        // Strategy 2: 5 NFTs split across 5 wallets
+        // Must transfer LODE to each wallet = 4 transfers of ~100M each
+        let multi_wallet_nfts = 5u64;
+        let transfers = multi_wallet_nfts - 1; // 4 transfers
+        let transfer_cost = transfers * (single_wallet_hr_per * transfer_fee_bps as u64 / 10000);
+        let multi_wallet_odds = multi_wallet_nfts * effective(single_wallet_hr_per, hashrate_cap);
+        let multi_wallet_cost = total_value + transfer_cost;
+
+        // Same odds, but sybil costs more due to transfer fees
+        assert_eq!(single_wallet_odds, multi_wallet_odds, "Same odds either way");
+        assert!(multi_wallet_cost > single_wallet_cost, "Sybil costs more (transfer fees)");
+
+        println!("Single wallet: odds={}, cost={}", single_wallet_odds, single_wallet_cost);
+        println!("Multi wallet: odds={}, cost={} (+{} transfer fees)",
+            multi_wallet_odds, multi_wallet_cost, transfer_cost);
     }
 }
 

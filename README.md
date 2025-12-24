@@ -12,6 +12,35 @@ LODE is a deflationary token protocol where users compete for lottery prizes by 
 3. Win LODE from dual lottery pools (hashrate-weighted + random)
 4. Upgrade miners to increase odds over time
 
+## Design Philosophy
+
+### The Balance Problem
+
+Most token protocols face a dilemma:
+- **Pure linear scaling** → Whales dominate, small fish leave
+- **Aggressive diminishing returns** → Whales sybil into many wallets, gaming the curve
+
+LODE solves this with **per-NFT caps** instead of per-wallet curves:
+
+```
+effective_hashrate = min(actual_hashrate, cap)
+```
+
+### Why This Works
+
+| Player | Strategy | Outcome |
+|--------|----------|---------|
+| Small fish | One miner, grind to cap | Competitive lottery odds |
+| Whale | Many miners at cap | More odds, but pays more rent & burns more LODE |
+| Sybil attacker | Split wallet | No benefit (cap is per-NFT, not per-wallet) |
+
+**The insight:** By making the NFT the unit of account (not the wallet), we eliminate sybil incentives while keeping whales engaged. Whales who want more lottery power must:
+1. Mint more NFTs (burns 70% of mint cost)
+2. Pay rent on each NFT (burns 70% of rent)
+3. Manage more assets
+
+This transforms whale accumulation from a zero-sum game into **protocol-aligned behavior** that increases deflation.
+
 ## Programs
 
 | Program | Address | Purpose |
