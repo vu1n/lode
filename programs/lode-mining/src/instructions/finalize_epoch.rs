@@ -151,6 +151,13 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], _data: &[u8]) -> P
         return Err(MiningError::InvalidPdaSeeds.into());
     }
 
+    // Read effective hashrate cap (bytes 87-95, 0 = no cap)
+    let effective_hashrate_cap = u64::from_le_bytes(
+        config_data[87..95]
+            .try_into()
+            .map_err(|_| MiningError::InvalidAccountData)?,
+    );
+
     // Validate epoch account
     let epoch_data = unsafe { epoch_account.borrow_mut_data_unchecked() };
     if epoch_data.len() < Epoch::SIZE {
@@ -281,9 +288,16 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], _data: &[u8]) -> P
                 .map_err(|_| MiningError::InvalidAccountData)?,
         );
 
+        // Apply hashrate cap for fair distribution
+        let capped_hashrate = if effective_hashrate_cap > 0 {
+            weighted_hashrate.min(effective_hashrate_cap)
+        } else {
+            weighted_hashrate
+        };
+
         // Check hashrate pool winner (mask-based)
         let key = generate_key(&nft_mint, vrf_seed);
-        let mask = calculate_mask(weighted_hashrate, difficulty);
+        let mask = calculate_mask(capped_hashrate, difficulty);
 
         if check_hit(key, target, mask) && hashrate_winner_count < Epoch::MAX_WINNERS_PER_POOL {
             // Mark as hashrate pool winner (byte 116)

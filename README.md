@@ -60,6 +60,22 @@ Each epoch has two prize pools:
 
 **Hash/Mask Mining:** For each NFT, we compute `key = hash(nft_mint || vrf_seed)` and check if it matches the random target within a mask. Higher hashrate = more permissive mask = higher win probability.
 
+### Per-NFT Hashrate Cap
+
+To keep small participants competitive and prevent whale dominance:
+
+```
+effective_hashrate = min(hashrate, cap)
+```
+
+**Why this matters:**
+- Each NFT's lottery odds are capped at a maximum effective hashrate
+- Small fish can reach the cap and compete on equal footing
+- Whales who want more odds must mint multiple NFTs (burns more LODE)
+- No sybil incentive—the cap is per-NFT, not per-wallet
+
+**The economics flip:** Whales now drive *more* deflation by minting multiple NFTs to scale, while paying rent on each one.
+
 ## Tokenomics
 
 ### Fee Flows
@@ -102,6 +118,7 @@ Splitting stake across wallets is unprofitable:
 | Age Bonus | +1%/epoch | Max +50% bonus for veteran miners |
 | Base Mint Cost | 100 LODE | Starting cost for new miner |
 | Difficulty | 1,000,000 | Mining difficulty calibration |
+| Hashrate Cap | 100M | Max effective hashrate per NFT for lottery |
 
 ## Development
 

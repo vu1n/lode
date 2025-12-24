@@ -64,7 +64,8 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], _data: &[u8]) -> 
     config_data[69..71].copy_from_slice(&MiningConfig::DEFAULT_MAX_AGE_BONUS_BPS.to_le_bytes());
     config_data[71..79].copy_from_slice(&MiningConfig::DEFAULT_BASE_MINT_COST.to_le_bytes());
     config_data[79..87].copy_from_slice(&clock.unix_timestamp.to_le_bytes());
-    config_data[87] = bump;
+    config_data[87..95].copy_from_slice(&MiningConfig::DEFAULT_EFFECTIVE_HASHRATE_CAP.to_le_bytes());
+    config_data[95] = bump;
 
     Ok(())
 }

@@ -322,6 +322,46 @@ mod lode_lottery {
         assert_eq!(effective_hashrate(base_hashrate, 100, max_age_bonus), 1_500_000);
     }
 
+    /// TLA+ Invariant: CappedHashrateInvariant
+    /// ```tla
+    /// CappedHashrateInvariant == \A nft \in NFTs: EffectiveHashrate(nft) <= HashrateCap
+    /// ```
+    /// Verifies: No NFT can have effective hashrate above cap for lottery purposes
+    #[test]
+    fn invariant_capped_hashrate() {
+        let hashrate_cap = 100_000_000u64; // 100M cap
+
+        fn capped_effective_hashrate(hashrate: u64, cap: u64) -> u64 {
+            if cap > 0 {
+                hashrate.min(cap)
+            } else {
+                hashrate // no cap
+            }
+        }
+
+        // Small fish at 10M: not capped
+        let small_fish = 10_000_000u64;
+        assert_eq!(capped_effective_hashrate(small_fish, hashrate_cap), 10_000_000);
+
+        // Medium player at 100M: exactly at cap
+        let medium = 100_000_000u64;
+        assert_eq!(capped_effective_hashrate(medium, hashrate_cap), 100_000_000);
+
+        // Whale at 1B: capped to 100M
+        let whale = 1_000_000_000u64;
+        assert_eq!(capped_effective_hashrate(whale, hashrate_cap), 100_000_000);
+
+        // With no cap (0), hashrate is uncapped
+        assert_eq!(capped_effective_hashrate(whale, 0), 1_000_000_000);
+
+        // Verify invariant: effective hashrate never exceeds cap (when cap > 0)
+        let test_hashrates = [1_000, 100_000, 1_000_000, 10_000_000, 100_000_000, 500_000_000, 1_000_000_000];
+        for hr in test_hashrates {
+            let effective = capped_effective_hashrate(hr, hashrate_cap);
+            assert!(effective <= hashrate_cap, "CappedHashrateInvariant violated: {} > {}", effective, hashrate_cap);
+        }
+    }
+
     /// TLA+ Distribution: 80/20 Pool Split
     /// ```tla
     /// hashrate_pool = 80% of total

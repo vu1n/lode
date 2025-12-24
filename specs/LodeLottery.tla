@@ -15,7 +15,8 @@ EXTENDS Integers, Sequences, FiniteSets, TLC
 CONSTANTS
     NFTs,               \* Set of all participating NFTs
     MaxHashrate,        \* Maximum hashrate value for modeling
-    MaxAgeBonus         \* Maximum age bonus (50 = 50%)
+    MaxAgeBonus,        \* Maximum age bonus (50 = 50%)
+    HashrateCap         \* Per-NFT effective hashrate cap for lottery
 
 VARIABLES
     hashrate_pool,      \* Function: nft -> weighted hashrate
@@ -82,12 +83,20 @@ AgeBonus(nft) ==
        ELSE raw_bonus
 
 (*
-Effective hashrate = base hashrate * (100 + age_bonus) / 100
+Effective hashrate = min(base hashrate * (100 + age_bonus) / 100, cap)
+The cap ensures fair distribution - whales must mint multiple NFTs to scale.
 *)
 EffectiveHashrate(nft) ==
     LET bonus == AgeBonus(nft)
         base == hashrate_pool[nft]
-    IN (base * (100 + bonus)) \div 100
+        uncapped == (base * (100 + bonus)) \div 100
+    IN IF uncapped > HashrateCap THEN HashrateCap ELSE uncapped
+
+(*
+Capped hashrate invariant: No NFT can have effective hashrate above cap
+*)
+CappedHashrateInvariant ==
+    \A nft \in NFTs: EffectiveHashrate(nft) <= HashrateCap
 
 (*
 Combined invariant
@@ -96,6 +105,7 @@ Invariant ==
     /\ TypeInvariant
     /\ LinearProportionality
     /\ UniformTickets
+    /\ CappedHashrateInvariant
 
 -----------------------------------------------------------------------------
 

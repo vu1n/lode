@@ -3,7 +3,7 @@
 /// Mining configuration PDA
 /// Seeds: ["mining_config"]
 ///
-/// Size: 8 + 32 + 8 + 8 + 8 + 8 + 8 + 2 + 2 + 8 + 8 + 1 + 7 = 108 bytes
+/// Size: 8 + 32 + 8 + 8 + 8 + 8 + 8 + 2 + 2 + 8 + 8 + 8 + 1 + 5 = 116 bytes
 #[repr(C)]
 pub struct MiningConfig {
     /// Discriminator for account type
@@ -28,15 +28,18 @@ pub struct MiningConfig {
     pub base_mint_cost: u64,
     /// Genesis timestamp
     pub genesis_timestamp: i64,
+    /// Per-NFT effective hashrate cap for lottery (0 = no cap)
+    /// Ensures fair distribution - whales must mint multiple NFTs to scale
+    pub effective_hashrate_cap: u64,
     /// PDA bump seed
     pub bump: u8,
     /// Padding for alignment
-    pub _padding: [u8; 6],
+    pub _padding: [u8; 5],
 }
 
 impl MiningConfig {
     pub const DISCRIMINATOR: [u8; 8] = *b"mineconf";
-    pub const SIZE: usize = 108;
+    pub const SIZE: usize = 116;
     pub const SEEDS: &'static [u8] = b"mining_config";
 
     /// Default epoch duration: 24 hours
@@ -59,6 +62,10 @@ impl MiningConfig {
 
     /// Default base mint cost: 100 LODE
     pub const DEFAULT_BASE_MINT_COST: u64 = 100_000_000_000;
+
+    /// Default effective hashrate cap: 100M (100_000_000)
+    /// Ensures fair lottery distribution - each NFT maxes out at this hashrate
+    pub const DEFAULT_EFFECTIVE_HASHRATE_CAP: u64 = 100_000_000;
 }
 
 /// Epoch state PDA
